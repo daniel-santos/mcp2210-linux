@@ -117,14 +117,8 @@ int mcp2210_gpio_probe(struct mcp2210_device *dev)
 
 void mcp2210_gpio_remove(struct mcp2210_device *dev)
 {
-	int ret;
-
 	mcp2210_info();
-	ret = gpiochip_remove(&dev->gpio);
-	if (ret) {
-		mcp2210_err("gpiochip_remove() failed with %de", ret);
-		return;
-	}
+	gpiochip_remove(&dev->gpio);
 	dev->s.is_gpio_probed = 0;
 }
 
