@@ -34,6 +34,10 @@
 # define HAVE_SET_DEBOUNCE 1
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0)
+# define HAVE_SET_EXPORTED 1
+#endif
+
 //static int  request	    (struct gpio_chip *chip, unsigned offset);
 //static void free	    (struct gpio_chip *chip, unsigned offset);
 #ifdef HAVE_GET_DIRECTION
@@ -98,7 +102,11 @@ int mcp2210_gpio_probe(struct mcp2210_device *dev)
 	gpio->names		= (void*)dev->names; /* older kernels use char** */
 	gpio->can_sleep		= 1; /* we have to make them sleep because we
 					need to do an URB */
+#ifdef HAVE_SET_EXPORTED
 	gpio->exported		= 0;
+#else
+	gpio->cdev = NULL;
+#endif
 
 
 	ret = gpiochip_add(gpio);
