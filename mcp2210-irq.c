@@ -27,14 +27,27 @@
 
 static int complete_poll(struct mcp2210_cmd *cmd, void *context);
 
+#define mcp2210_calc_irq_mask(mcp2210, irq_data) \
+	(1 << ((irq_data)->irq - (mcp2210)->irq_base))
+
 static void mcp2210_irq_mask(struct irq_data *data) {
 	struct mcp2210_device *dev = irq_data_get_irq_chip_data(data);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
 	dev->irq_mask |= data->mask;
+#else
+	unsigned mask = mcp2210_calc_irq_mask(dev, data);
+	dev->irq_mask |= mask;
+#endif
 }
 
 static void mcp2210_irq_unmask(struct irq_data *data) {
 	struct mcp2210_device *dev = irq_data_get_irq_chip_data(data);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
 	dev->irq_mask &= ~data->mask;
+#else
+	unsigned mask = mcp2210_calc_irq_mask(dev, data);
+	dev->irq_mask &= ~mask;
+#endif
 }
 
 static int mcp2210_irq_set_type(struct irq_data *data, unsigned int flow_type) {
