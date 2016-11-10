@@ -194,9 +194,13 @@ void _mcp2210_irq_do_gpio(struct mcp2210_device *dev, u16 old_val, u16 new_val)
 			continue;
 
 		if (pin->irq_type & (new_pin_val ? up_mask : down_mask)) {
-			int virq = dev->irq_base + pin->irq;
 			struct irq_desc *desc = dev->irq_descs[pin->irq];
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+			handle_simple_irq(desc);
+#else
+			int virq = dev->irq_base + pin->irq;
 			handle_simple_irq(virq, desc);
+#endif
 		}
 	}
 }
@@ -212,7 +216,11 @@ void _mcp2210_irq_do_intr_counter(struct mcp2210_device *dev, u16 count)
 	/* We're discarding count and just letting handlers know that at least
 	 * one interrupt occured. Maybe needs a mechanism to let consumers
 	 * know the count? */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,3,0)
+	handle_simple_irq(desc);
+#else
 	handle_simple_irq(dev->irq_base + pin->irq, desc);
+#endif
 }
 
 static void warn_poll_past_due(struct mcp2210_device *dev, unsigned long now,
