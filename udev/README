@@ -1,7 +1,7 @@
 To automatically unbind usbhid from the mcp2210, and bind to the
 mcp2210 driver, use the scripts included in this directory.
 
-Copy rebind_sysfs_driver.sh to /usr/local/sbin, set permissions to 0755.
+Copy mcp2210-bind.sh to /usr/lib/udev, set permissions to 0755.
 Copy 99-mcp2210.rules to /etc/udev/rules.d.
 
 When you connect the mcp2210, the kernel will attach usbhid, but the
