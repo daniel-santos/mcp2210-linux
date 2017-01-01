@@ -93,7 +93,11 @@ int mcp2210_gpio_probe(struct mcp2210_device *dev)
 		return -EINVAL;
 
 	gpio->label		= "mcp2210";
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,5,0)
+	gpio->parent	= &dev->udev->dev;
+#else
 	gpio->dev		= &dev->udev->dev;
+#endif
 	gpio->owner		= THIS_MODULE;
 //	INIT_LIST_HEAD(&gpio->list);
 

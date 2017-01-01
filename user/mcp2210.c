@@ -1184,10 +1184,12 @@ static int process_args(int argc, char *argv[])
 			get_unsigned_param(optarg, &config.spi.bits_per_word, 8, 8);
 			break;
 		case 'l': config.spi.mode |= SPI_LOOP;			break;
-		case 'H': if (!get_bool_param(optarg))
-				config.spi.mode &= ~SPI_CPHA;		break;
-		case 'O': if (!get_bool_param(optarg))
-				config.spi.mode &= ~SPI_CPOL;		break;
+		case 'H': 
+			if (!get_bool_param(optarg)) config.spi.mode &= ~SPI_CPHA;
+			break;
+		case 'O':
+			if (!get_bool_param(optarg)) config.spi.mode &= ~SPI_CPOL;
+			break;
 		case 'L': config.spi.mode |= SPI_LSB_FIRST;		break;
 		case 'C': config.spi.mode |= SPI_CS_HIGH;		break;
 		case '3': config.spi.mode |= SPI_3WIRE;			break;
