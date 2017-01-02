@@ -1,0 +1,3 @@
+# Unbind usbhid and rebind to mcp2210 driver
+
+ACTION=="add", DRIVER=="usbhid", SUBSYSTEMS=="usb", ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="00de", RUN+="/usr/local/sbin/rebind_sysfs_driver.sh %S%p %k %S/bus/usb/drivers/mcp2210"
