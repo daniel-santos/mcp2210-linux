@@ -238,6 +238,9 @@ out of date info:
 #include <linux/usb.h>
 #include <linux/workqueue.h>
 #include <linux/uaccess.h>
+#ifdef CONFIG_OF
+#include <linux/of.h>
+#endif
 //#include <linux/completion.h>
 #include <linux/compiler.h>
 
@@ -733,6 +736,358 @@ static inline int eeprom_read_complete(struct mcp2210_cmd *cmd_head,
 }
 #endif /* CONFIG_MCP2210_CREEK */
 
+#ifdef CONFIG_OF
+/* --------------------------------------------------------------------------*/
+/**
+ * @brief This function is used to parse the device tree node for mcp2210
+ *        if available and based on that configure the mcp2210 bridge.
+ *
+ * @Param dev mcp2210 device struct pointer
+ *
+ * @Returns  0 on success, negative values on error
+ */
+/* ----------------------------------------------------------------------------*/
+static int mcp2210_parse_dts(struct mcp2210_device *dev)
+{
+    struct device_node *np;
+    struct mcp2210_board_config board_config;
+    struct mcp2210_chip_settings chip_settings;
+    struct mcp2210_chip_settings powerup_chip_settings;
+    struct mcp2210_spi_xfer_settings spi_settings;
+    struct mcp2210_spi_xfer_settings powerup_spi_settings;
+    struct mcp2210_usb_key_params usb_key_params;
+    struct mcp2210_ioctl_data *data;
+    struct mcp2210_ioctl_data_config *cfg;
+    size_t struct_size = IOCTL_DATA_CONFIG_SIZE;
+    size_t strings_size = 0;
+    enum mcp2210_ioctl_cmd ioctl_cmd = MCP2210_IOCTL_CONFIG_SET;
+    size_t result_size;
+    struct ioctl_result *result;
+    u8 value;
+    u8 have_board_config = 0;
+    int ret = 0;
+    u32 i;
+
+    /* Initialize the structures */
+    memset (&board_config, 0, sizeof(board_config));
+    memset (&chip_settings, 0, sizeof(chip_settings));
+    memset (&powerup_chip_settings, 0, sizeof(powerup_chip_settings));
+    memset (&spi_settings, 0, sizeof(spi_settings));
+    memset (&powerup_spi_settings, 0, sizeof(powerup_spi_settings));
+    memset (&usb_key_params, 0, sizeof(usb_key_params));
+
+    /* Determine if a device tree entry is available for this driver. */
+    np = of_find_compatible_node(NULL, NULL, "microchip,mcp2210");
+    if(np)
+    {
+        struct device_node *temp;
+        struct device_node *np_pin;
+        /* Parse the pin_configuration node */
+        temp = of_get_child_by_name(np, "pin_configuration");
+        if(temp)
+        {
+            of_property_read_u32(temp, "poll_gpio_usecs",
+                    &board_config.poll_gpio_usecs);
+            of_property_read_u32(temp, "stale_gpio_usecs",
+                    &board_config.stale_gpio_usecs);
+            of_property_read_u32(temp, "poll_intr_usecs",
+                    &board_config.poll_intr_usecs);
+            of_property_read_u32(temp, "stale_intr_usecs",
+                    &board_config.stale_intr_usecs);
+            /* Bit field pointer can not be passed directly to
+             * of_property_* calls */
+            if (0 == of_property_read_u8(temp, "_3wire_capable", &value))
+                board_config._3wire_capable = value;
+            if (0 == of_property_read_u8(temp, "_3wire_tx_enable_active_high",
+                        &value))
+                board_config._3wire_tx_enable_active_high = value;
+
+            of_property_read_u8(temp, "_3wire_tx_enable_pin",
+                    &board_config._3wire_tx_enable_pin);
+            of_property_read_u32(temp, "strings_size",
+                    &board_config.strings_size);
+
+            /* Parse all the pin configurations */
+            for_each_child_of_node (temp, np_pin)
+            {
+                struct device_node *spi_node;
+                u8 pin;
+                if (of_property_read_u8(np_pin, "pin", &pin))
+                {
+                    mcp2210_err("pin property not found, ignoring rest of this child\n");
+                    continue;
+                }
+                if (pin > MCP2210_NUM_PINS) {
+                    mcp2210_err("Invalid pin number %d in pin node\n", pin);
+                    continue;
+                }
+                /* Bit field pointer can not be passed directly to
+                 * of_property_* calls */
+                if (0 == of_property_read_u8(np_pin, "mode", &value))
+                    board_config.pins[pin].mode = value;
+                if (0 == of_property_read_u8(np_pin, "has_irq", &value))
+                    board_config.pins[pin].has_irq = value;
+                if (0 == of_property_read_u8(np_pin, "irq", &value))
+                    board_config.pins[pin].irq = value;
+                if (0 == of_property_read_u8(np_pin, "irq_type", &value))
+                    board_config.pins[pin].irq_type = value;
+
+                if (of_property_read_string(np_pin, "pin_name",
+                            &board_config.pins[pin].name))
+                    board_config.pins[pin].name = NULL;
+                if (of_property_read_string(np_pin, "modalias",
+                            &board_config.pins[pin].modalias))
+                    board_config.pins[pin].modalias = NULL;
+
+                /* Parse spi settings, if available for this pin */
+                spi_node = of_get_child_by_name(np_pin, "spi_prop");
+                if (spi_node)
+                {
+                    of_property_read_u32(spi_node, "spi,max_speed_hz",
+                            &board_config.pins[pin].spi.max_speed_hz);
+                    of_property_read_u32(spi_node, "spi,min_speed_hz",
+                            &board_config.pins[pin].spi.min_speed_hz);
+                    of_property_read_u8(spi_node, "spi,mode",
+                            &board_config.pins[pin].spi.mode);
+                    of_property_read_u8(spi_node, "spi,bits_per_word",
+                            &board_config.pins[pin].spi.bits_per_word);
+
+                    /* Bit field pointer can not be passed directly to
+                     * of_property_* calls */
+                    if (0 == of_property_read_u8(spi_node, "spi,use_cs_gpio",
+                                &value))
+                        board_config.pins[pin].spi.use_cs_gpio = value;
+
+                    of_property_read_u16(spi_node, "spi,cs_to_data_delay",
+                            &board_config.pins[pin].spi.cs_to_data_delay);
+                    of_property_read_u16(spi_node, "spi,cs_to_data_delay",
+                            &board_config.pins[pin].spi.cs_to_data_delay);
+                    of_property_read_u16(spi_node, "spi,last_byte_to_cs_delay",
+                            &board_config.pins[pin].spi.last_byte_to_cs_delay);
+                    of_property_read_u16(spi_node, "spi,delay_between_bytes",
+                            &board_config.pins[pin].spi.delay_between_bytes);
+                    of_property_read_u16(spi_node, "spi,delay_between_xfers",
+                            &board_config.pins[pin].spi.delay_between_xfers);
+                }
+            }
+            have_board_config = 1;
+        }
+        else
+            have_board_config = 0;
+
+        /* Based on the hardware configuration, allocated configuration
+         * structre */
+        for (i = 0; i < MCP2210_NUM_PINS; ++i) {
+            const struct mcp2210_pin_config *pin = &board_config.pins[i];
+            if (pin->name && *pin->name)
+                strings_size += strlen(pin->name) + 1;
+            if (pin->modalias && *pin->modalias)
+                strings_size += strlen(pin->modalias) + 1;
+        }
+        struct_size += strings_size;
+
+        data = kzalloc(struct_size, GFP_KERNEL);
+        if (!data) {
+            mcp2210_err("Failed to allocate memory for configurations");
+            return -ENOMEM;
+        }
+
+        data->struct_size = struct_size;
+        cfg = &data->body.config;
+        cfg->have_config = have_board_config;
+        /* Parse the chip_settings */
+        temp = of_get_child_by_name(np, "chip_settings");
+        if (temp)
+        {
+            of_property_read_u8_array(temp,"pin_mode",
+                    chip_settings.pin_mode, MCP2210_NUM_PINS);
+            of_property_read_u16(temp, "gpio_value",
+                    &chip_settings.gpio_value);
+            of_property_read_u16(temp, "gpio_direction",
+                    &chip_settings.gpio_direction);
+            of_property_read_u8(temp, "other_settings",
+                    &chip_settings.other_settings);
+            of_property_read_u8(temp, "nvram_access_control",
+                    &chip_settings.nvram_access_control);
+            of_property_read_u8_array(temp, "password",
+                    &chip_settings.nvram_access_control, 8);
+
+            cfg->state.have_chip_settings = 1;
+        }
+        else
+            cfg->state.have_chip_settings = 0;
+
+        /* Parse powerup chip settings */
+        temp = of_get_child_by_name(np, "powerup_chip_settings");
+        if (temp)
+        {
+            of_property_read_u8_array(temp,"pin_mode",
+                    powerup_chip_settings.pin_mode, MCP2210_NUM_PINS);
+            of_property_read_u16(temp, "gpio_value",
+                    &powerup_chip_settings.gpio_value);
+            of_property_read_u16(temp, "gpio_direction",
+                    &powerup_chip_settings.gpio_direction);
+            of_property_read_u8(temp, "other_settings",
+                    &powerup_chip_settings.other_settings);
+            of_property_read_u8(temp, "nvram_access_control",
+                    &powerup_chip_settings.nvram_access_control);
+            of_property_read_u8_array(temp, "password",
+                    &powerup_chip_settings.nvram_access_control, 8);
+
+            cfg->state.have_power_up_chip_settings = 1;
+        }
+        else
+            cfg->state.have_power_up_chip_settings = 0;
+
+        /* Parse spi transfer settings */
+        temp = of_get_child_by_name(np, "spi_settings");
+        if (temp)
+        {
+            of_property_read_u32(temp, "bitrate", &spi_settings.bitrate);
+            of_property_read_u16(temp, "idle_cs", &spi_settings.idle_cs);
+            of_property_read_u16(temp, "active_cs", &spi_settings.active_cs);
+            of_property_read_u16(temp, "cs_to_data_delay",
+                    &spi_settings.cs_to_data_delay);
+            of_property_read_u16(temp, "last_byte_to_cs_delay",
+                    &spi_settings.last_byte_to_cs_delay);
+            of_property_read_u16(temp, "delay_between_bytes",
+                    &spi_settings.delay_between_bytes);
+            of_property_read_u16(temp, "bytes_per_trans",
+                    &spi_settings.bytes_per_trans);
+            of_property_read_u8(temp, "mode", &spi_settings.mode);
+
+            cfg->state.have_spi_settings = 1;
+        }
+        else
+            cfg->state.have_spi_settings = 0;
+
+        /* Parse powerup spi transfer settings */
+        temp = of_get_child_by_name(np, "powerup_spi_settings");
+        if (temp)
+        {
+            of_property_read_u32(temp, "bitrate",
+                    &powerup_spi_settings.bitrate);
+            of_property_read_u16(temp, "idle_cs",
+                    &powerup_spi_settings.idle_cs);
+            of_property_read_u16(temp, "active_cs",
+                    &powerup_spi_settings.active_cs);
+            of_property_read_u16(temp, "cs_to_data_delay",
+                    &powerup_spi_settings.cs_to_data_delay);
+            of_property_read_u16(temp, "last_byte_to_cs_delay",
+                    &powerup_spi_settings.last_byte_to_cs_delay);
+            of_property_read_u16(temp, "delay_between_bytes",
+                    &powerup_spi_settings.delay_between_bytes);
+            of_property_read_u16(temp, "bytes_per_trans",
+                    &powerup_spi_settings.bytes_per_trans);
+            of_property_read_u8(temp, "mode", &powerup_spi_settings.mode);
+
+            cfg->state.have_power_up_spi_settings = 1;
+        }
+        else
+            cfg->state.have_power_up_spi_settings = 0;
+
+        /* Parse usb settings, at present even though you change these settings
+         * driver won't get probed without changing the driver code */
+        temp = of_get_child_by_name(np, "usb_settings");
+        if (temp)
+        {
+            of_property_read_u16(temp, "vid", &usb_key_params.vid);
+            of_property_read_u16(temp, "pid", &usb_key_params.pid);
+            of_property_read_u8(temp, "chip_power_option",
+                    &usb_key_params.chip_power_option);
+            of_property_read_u8(temp, "requested_power",
+                    &usb_key_params.requested_power);
+
+            cfg->state.have_usb_key_params = 1;
+        }
+        else
+            cfg->state.have_usb_key_params = 0;
+    }
+    else
+    {
+        mcp2210_err("mcp2210 device tree node NOT found\n");
+        return -1;
+    }
+
+    if (cfg->state.have_chip_settings)
+        memcpy(&cfg->state.chip_settings,
+                &chip_settings,
+                sizeof(chip_settings));
+
+    if (cfg->state.have_power_up_chip_settings)
+        memcpy(&cfg->state.power_up_chip_settings,
+                &powerup_chip_settings,
+                sizeof(powerup_chip_settings));
+
+    if (cfg->state.have_spi_settings)
+        memcpy(&cfg->state.spi_settings,
+                &spi_settings,
+                sizeof(spi_settings));
+
+    if (cfg->state.have_power_up_spi_settings)
+    {
+        memcpy(&cfg->state.power_up_spi_settings,
+                &powerup_spi_settings,
+                sizeof(powerup_spi_settings));
+    }
+
+    if (cfg->state.have_usb_key_params)
+        memcpy(&cfg->state.usb_key_params,
+                &usb_key_params,
+                sizeof(usb_key_params));
+
+    if (cfg->have_config)
+    {
+        cfg->config.strings_size = strings_size;
+        copy_board_config(&cfg->config, &board_config, 0);
+    }
+
+    /* minimum valid size */
+    if (unlikely(struct_size < IOCTL_DATA_CONFIG_SIZE)) {
+        mcp2210_warn("request overflow : %u", struct_size);
+        ret = -EOVERFLOW;
+        goto free_mem;
+    }
+
+    /* max size */
+    if (unlikely(struct_size > 0x4000)) {
+        mcp2210_warn("request too large: %u", struct_size);
+        ret = -EINVAL;
+        goto free_mem;
+    }
+
+    result_size = sizeof(struct ioctl_result) + struct_size;
+    if (!(result = kzalloc(result_size, GFP_KERNEL))) {
+        mcp2210_err("Failed to allocate %u bytes\n", (uint)result_size);
+        ret = -ENOMEM;
+        goto free_mem;
+    }
+
+    init_completion(&result->completion);
+    result->ioctl_cmd = ioctl_cmd;
+    result->user_data = data;
+    memcpy(result->payload, data, struct_size);
+
+    /* just a sanity check */
+    BUG_ON(result->payload->struct_size != struct_size);
+
+    if ((ret = mcp2210_ioctl_config_set(dev, result)))
+    {
+        mcp2210_err("Failed to execute ioctl command config set\n");
+        ret = -1;
+    }
+
+    if (result)
+        kfree (result);
+
+free_mem:
+    if (data)
+        kfree (data);
+
+    return ret;
+}
+#endif /* CONFIG_OF */
+
 /* mcp2210_probe
  * can sleep, but keep it minimal as the USB core uses a single thread to probe
  * & remove all USB devices.
@@ -876,6 +1231,11 @@ int mcp2210_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	if (ret < 0)
 		goto error_deregister_dev;
+
+#ifdef CONFIG_OF
+    mcp2210_parse_dts(dev);
+#endif
+	mcp2210_info("success");
 
 	return 0;
 

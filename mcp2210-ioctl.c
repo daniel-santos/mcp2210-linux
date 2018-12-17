@@ -26,23 +26,8 @@
 #include "mcp2210.h"
 #include "mcp2210-debug.h"
 
-struct ioctl_result {
-	enum mcp2210_ioctl_cmd ioctl_cmd;
-	struct completion completion;
-	__user struct mcp2210_ioctl_data *user_data;
-	union mcp2210_cmd_any *cmd;
-	int status;
-	u8 mcp_status;
-	unsigned num_cmds;
-	unsigned num_cmds_finished;
-	struct mcp2210_board_config *new_config;
-	struct mcp2210_ioctl_data payload[0];
-};
-
-static long mcp2210_ioctl_cmd(struct mcp2210_device *dev, struct ioctl_result *result);
 static long mcp2210_ioctl_eeprom(struct mcp2210_device *dev, struct ioctl_result *result);
 static long mcp2210_ioctl_config_get(struct mcp2210_device *dev, struct ioctl_result *result);
-static long mcp2210_ioctl_config_set(struct mcp2210_device *dev, struct ioctl_result *result);
 
 static struct ioctl_cmds {
 	long (*func)(struct mcp2210_device *dev, struct ioctl_result *result);
@@ -226,7 +211,7 @@ static int mcp2210_ioctl_complete(struct mcp2210_cmd *cmd_head, void *context)
 	return ret;
 }
 
-static long mcp2210_ioctl_cmd(struct mcp2210_device *dev, struct ioctl_result *result)
+long mcp2210_ioctl_cmd(struct mcp2210_device *dev, struct ioctl_result *result)
 {
 	struct mcp2210_ioctl_data_cmd *idc = &result->payload->body.cmd;
 	struct mcp2210_cmd_ctl *cmd;
@@ -415,7 +400,7 @@ exit_unlock:
 	return ret;
 }
 
-static long mcp2210_ioctl_config_set(struct mcp2210_device *dev, struct ioctl_result *result)
+long mcp2210_ioctl_config_set(struct mcp2210_device *dev, struct ioctl_result *result)
 {
 	struct mcp2210_ioctl_data *id = result->payload;
 	struct mcp2210_ioctl_data_config *idc = &id->body.config;

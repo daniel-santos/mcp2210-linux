@@ -1218,6 +1218,22 @@ struct mcp2210_ioctl_data {
 #define IOCTL_DATA_CMD_SIZE  offsetof( \
 			struct mcp2210_ioctl_data, body.config.config.strings)
 
+struct ioctl_result {
+	enum mcp2210_ioctl_cmd ioctl_cmd;
+	struct completion completion;
+	__user struct mcp2210_ioctl_data *user_data;
+	union mcp2210_cmd_any *cmd;
+	int status;
+	u8 mcp_status;
+	unsigned num_cmds;
+	unsigned num_cmds_finished;
+	struct mcp2210_board_config *new_config;
+	struct mcp2210_ioctl_data payload[0];
+};
+
+long mcp2210_ioctl_cmd(struct mcp2210_device *dev, struct ioctl_result *result);
+long mcp2210_ioctl_config_set(struct mcp2210_device *dev, struct ioctl_result *result);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

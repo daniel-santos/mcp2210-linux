@@ -1,0 +1,148 @@
+MCP2210 - USB to SPI bridge device tree node.
+
+Using this device tree node, user can configure MCP2210 device on the target
+hardware based on the target design.
+
+Required properties:
+
+- compatible :      Should be "microchip,mcp2210"
+
+Please refer https://github.com/daniel-santos/mcp2210-linux and MCP2210 data-sheet
+for detail information of following child nodes of mcp2210 device tree node.
+
+---------------------------------------------------------------------------------
+| Child node           |  Datasheeet section |    MCP2210 Strcture              |
+|-------------------------------------------------------------------------------|
+| powerup_chip_settings|         3.1.1       | struct mcp2210_chip_settings     |
+| chip_settings        |         3.2.4       | struct mcp2210_chip_settings     |
+| powerup_spi_settings |         3.1.2       | struct mcp2210_spi_xfer_settings |
+| spi_settings         |         3.2.2       | struct mcp2210_spi_xfer_settings |
+| usb_settings         |         3.1.2       | struct mcp2210_usb_key_params    |
+| pin_connfigurations  |         none        | struct mcp2210_board_config      |
+---------------------------------------------------------------------------------
+
+mcp2210 {
+    compatible = "microchip,mcp2210";
+
+    powerup_chip_settings {
+        pin_mode = [01 00 00 00 00 00 00 00 00];
+        gpio_value = /bits/ 16 <0x0000>;
+        gpio_direction = /bits/ 16 <0x0040>; /* 0x0040 = 0000 0100 0000 */
+        other_settings = /bits/ 8 <0x01>;
+        nvram_access_control = /bits/ 8 <0>;
+        password = [00 00 00 00 00 00 00 00];
+    };
+
+    chip_settings {
+        pin_mode = [01 00 00 00 00 00 00 00 00];
+        gpio_value = /bits/ 16 <0x0000>;
+        gpio_direction = /bits/ 16 <0x0040>; /* 0x0040 = 0000 0100 0000 */
+        other_settings = /bits/ 8 <0x01>;
+        nvram_access_control = /bits/ 8 <0>;
+        password = [00 00 00 00 00 00 00 00];
+    };
+
+    powerup_spi_settings {
+        /* Powerup spi settings */
+        bitrate	= <12000000>;
+        idle_cs	= /bits/ 16 <0x01ff>;
+        active_cs = /bits/ 16 <0x0000>;
+        cs_to_data_delay = /bits/ 16 <10>;
+        last_byte_to_cs_delay = /bits/ 16 <10>;
+        delay_between_bytes	= /bits/ 16 <10>;
+        bytes_per_trans	= /bits/ 16 <5>;
+        mode = /bits/ 8 <3>;
+    };
+
+    spi_settings {
+        /* Powerup spi settings */
+        bitrate	= <12000000>;
+        idle_cs	= /bits/ 16 <0x01ff>;
+        active_cs = /bits/ 16 <0x0000>;
+        cs_to_data_delay = /bits/ 16 <10>;
+        last_byte_to_cs_delay = /bits/ 16 <10>;
+        delay_between_bytes	= /bits/ 16 <10>;
+        bytes_per_trans	= /bits/ 16 <5>;
+        mode = /bits/ 8 <3>;
+    };
+
+    usb_settings {
+        /* usb key parameters */
+        vid	= /bits/ 16 <0x04d8>; /* Microchip */
+        pid	= /bits/ 16 <0x00de>; /* USB device ID */
+        chip_power_option = /bits/ 8 <0x80>;
+        requested_power   = /bits/ 8 <0x32>; /* 100mA */
+    };
+
+    pin_configuration {
+        /* board specific configurations */
+        poll_gpio_usecs	= <0>;
+        stale_gpio_usecs = <0>;
+        poll_intr_usecs	= <0>;
+        stale_intr_usecs = <0>;
+        3wire_capable = /bits/ 8 <0>;
+        3wire_tx_enable_active_high = /bits/ 8 <0>;
+        3wire_tx_enable_pin	= /bits/ 8 <0>;
+        strings_size = <0>;
+
+        pin@0 {
+            pin = /bits/ 8 <0>;
+            mode = /bits/ 8 <1>;
+            pin_name = "HI-3200";
+            modalias = "spidev"; /* Determines which SPI driver to use */
+            spi_prop {
+                spi,max_speed_hz = <20000>;
+                spi,min_speed_hz = <2000>;
+                spi,mode = /bits/ 8 <3>;
+                spi,bits_per_word = /bits/ 8 <8>;
+                spi,cs_to_data_delay = /bits/ 16 <10>;
+                spi,last_byte_to_cs_delay = /bits/ 16 <10>;
+                spi,delay_between_bytes = /bits/ 16 <10>;
+                spi,delay_between_xfers = /bits/ 16 <10>;
+            };
+        };
+        pin@1 {
+            pin = /bits/ 8 <1>;
+            mode = /bits/ 8 <0>;
+            pin_name ="gpio%d";
+        };
+        pin@2 {
+            pin = /bits/ 8 <2>;
+            mode = /bits/ 8 <0>;
+            pin_name ="gpio%d";
+        };
+        pin@3 {
+            pin = /bits/ 8 <3>;
+            mode = /bits/ 8 <0>;
+            pin_name ="gpio%d";
+        };
+        pin@4 {
+            pin = /bits/ 8 <4>;
+            mode = /bits/ 8 <0>;
+            pin_name ="gpio%d";
+        };
+        pin@5 {
+            pin = /bits/ 8 <5>;
+            mode = /bits/ 8 <0>;
+            pin_name ="gpio%d";
+        };
+        pin@6 {
+            pin = /bits/ 8 <6>;
+            mode = /bits/ 8 <0>;
+            has_irq = /bits/ 8 <0>;
+            irq = /bits/ 8 <0>;
+            pin_name ="gpio%d";
+        };
+        pin@7 {
+            pin = /bits/ 8 <7>;
+            mode = /bits/ 8 <0>;
+            pin_name ="gpio%d";
+        };
+        pin@8 {
+            pin = /bits/ 8 <8>;
+            mode = /bits/ 8 <0>;
+            pin_name ="gpio%d";
+        };
+    };
+};
+
