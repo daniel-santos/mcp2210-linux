@@ -803,7 +803,7 @@ static int spi_complete_urb(struct mcp2210_cmd *cmd_head)
 		}
 
 		mcp2210_info("Starting next spi_transfer...");
-		xfer = list_entry(next, struct spi_transfer,
+		cmd->xfer = list_entry(next, struct spi_transfer,
 				  transfer_list);
 		cmd->pos = 0;
 		cmd->pending_bytes = 0;
