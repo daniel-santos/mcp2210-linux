@@ -99,7 +99,7 @@ int mcp2210_irq_probe(struct mcp2210_device *dev)
 	for (i = 0; i < dev->nr_irqs; ++i) {
 		int virq = dev->irq_base + i;
 
-		dev->irq_descs[i] = irq_to_desc(virq);
+		dev->irq_descs[i] = irq_data_to_desc( irq_get_irq_data(virq));		
 		BUG_ON(!dev->irq_descs[i]);
 		irq_set_chip_data(virq, dev);
 		irq_set_chip(virq, &mcp2210_irq_chip);

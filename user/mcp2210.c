@@ -557,7 +557,7 @@ static int eeprom_write(int argc, char *argv[]) {
 static int eeprom_read_write(int is_read, int argc, char *argv[]) {
 	struct mcp2210_ioctl_data *data;
 	struct mcp2210_ioctl_data_eeprom *eeprom;
-	const size_t struct_size = IOCTL_DATA_EEPROM_SIZE + 0x100;
+	const size_t struct_size = sizeof(struct mcp2210_ioctl_data);
 	uint addr = 0;
 	uint size = 0;
 	int i;

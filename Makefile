@@ -4,7 +4,9 @@
 # Derived from the good-ole LDD3 Makefile
 #
 
-ccflags-y += -Wall -Werror -Wunused-macros
+CONFIG_MODULE_SIG=n
+
+ccflags-y += -Wall -Werror -Wunused-macros -Wno-implicit-fallthrough
 
 # To build modules outside of the kernel tree, we run "make"
 # in the kernel source tree; the Makefile these then includes this
